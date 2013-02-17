@@ -1,0 +1,1 @@
+A small package for object concurrency using C++11
