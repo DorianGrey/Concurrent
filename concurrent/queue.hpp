@@ -79,6 +79,21 @@ namespace concurrent
                 return *this;
             }
 
+            /** \brief Second option to retrieve something from the list - is a little shorter for the caller
+             *
+             */
+            MsgType pop()
+            {
+                std::unique_lock<std::mutex> lock(this->__accessMutex); // Since std::queue is not thread-safe, we need the lock here.
+                this->__waitCondition.wait(lock, [this]()->bool         // We have to wait for the given condition after getting the lock granted.
+                {
+                    return !this->__storage.empty();
+                });
+                auto destination = this->__storage.front();
+                this->__storage.pop();
+                return destination;
+            }
+
         private:
             // Prohibitions
             queue(const queue& rhs);                /**< queues must not be copied */

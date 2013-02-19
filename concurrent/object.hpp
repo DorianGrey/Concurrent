@@ -6,6 +6,7 @@
 #include <future>
 #include <memory>
 #include <thread>
+#include <iostream>
 
 #include "queue.hpp"
 
@@ -20,7 +21,14 @@ namespace concurrent
     class object
     {
         public:
-            object(T t = T{}) : __myT(t), __done(false), __workerThread([=]() -> void {while (!__done) { std::function<void()> fu; __innerqueue >> fu; fu(); }}) // Little complicated, but that's the horror we face due to s.th. like a pop() ...
+            /*
+                Ok, I must admit that I don't understand what happened here...
+                Without a line of code that is forced to be executed (since it modifies external streams), in this case "std::cerr << std::endl;",
+                the thread gets ID -1 assigned, which crashes the lock and thus the whole application itself.
+                Otherwise, it gets a valid ID and runs perfectly... but why ? 
+
+            */
+            object(T t = T{}) : __myT(t), __done(false), __workerThread([=]() -> void { std::cerr << std::endl; while (!__done) { this->__innerqueue.pop()(); }}) // Little complicated, but that's the horror we face due to s.th. like a pop() ...
             {
 
             }
@@ -32,12 +40,12 @@ namespace concurrent
             }
 
             template<typename F>
-            auto operator[](F f) const -> std::future<decltype(f(__myT))>
+            auto operator()(F f) const -> std::future<decltype(f(__myT))>
             {
                 auto promisedRes = std::make_shared< std::promise<decltype(f(__myT))> >();
                 auto ret = promisedRes->get_future();
 
-                this->__innerqueue << ([=]() { 
+                this->__innerqueue << ([=]() -> void { 
                     try
                     {
                         this->__set_value(*promisedRes, f, this->__myT);

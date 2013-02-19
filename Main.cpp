@@ -13,9 +13,9 @@ int main (int argc, char** argv)
 
     concurrent::object<std::string> blub ("Hello World!");
 
-    auto res = blub[ [](std::string& s){
+    auto res = blub( [](std::string& s) -> std::string{
         return s + " omfg!";
-    }];
+    });
 
     std::cout << res.get() << std::endl;
     return 0;
