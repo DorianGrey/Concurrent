@@ -1,14 +1,22 @@
 #ifndef __CONCURRENT_OBJECT_HPP__ 
 #define __CONCURRENT_OBJECT_HPP__
 
+#include <atomic>
 #include <exception>
 #include <functional>
 #include <future>
+#include <iostream>
 #include <memory>
 #include <thread>
-#include <iostream>
 
 #include "queue.hpp"
+
+/************************************************************************/
+/* TODOS                                                                */
+/* - Deal with copy + move c'tor                                        */
+/* - more tests                                                         */
+/* - documentation                                                      */
+/************************************************************************/
 
 namespace concurrent
 {
@@ -18,22 +26,15 @@ namespace concurrent
      *
      */
     template<typename T>
-    class object
+    class async_object
     {
         public:
-            /*
-                Ok, I must admit that I don't understand what happened here...
-                Without a line of code that is forced to be executed (since it modifies external streams), in this case "std::cerr << std::endl;",
-                the thread gets ID -1 assigned, which crashes the lock and thus the whole application itself.
-                Otherwise, it gets a valid ID and runs perfectly... but why ? 
-
-            */
-            object(T t = T{}) : __myT(t), __done(false), __workerThread([=]() -> void { std::cerr << std::endl; while (!__done) { this->__innerqueue.pop()(); }}) // Little complicated, but that's the horror we face due to s.th. like a pop() ...
+            async_object(T t = T{}) : __myT(t), __workerThread([=]() -> void { __done = false; while (!__done) { this->__innerqueue.pop()(); }}) // Little complicated, but that's the horror we face due to s.th. like a pop() ...
             {
 
             }
 
-            ~object() 
+            ~async_object() 
             {
                 this->__innerqueue << ([=]() { __done = true; });
                 this->__workerThread.join();
@@ -59,11 +60,12 @@ namespace concurrent
             }
 
 
-        private:
-            bool __done;
+        private:             
             mutable T __myT;
-            std::thread __workerThread;
             mutable concurrent::queue<std::function<void()>, std::queue> __innerqueue;
+            std::atomic_bool __done;
+            std::thread __workerThread;
+            
 
             template<typename Fut, typename F, typename T>
             void __set_value(std::promise<Fut>& p, F& f, T& t) const 
@@ -76,6 +78,35 @@ namespace concurrent
                 f(t);
                 p.set_value();
             }
+    };
+
+    template<typename T>
+    class sync_object
+    {
+        public:
+            /*
+
+            */
+            sync_object(T t = T{}) : __myT(t)
+            {
+
+            }
+
+            ~sync_object() 
+            {
+
+            }
+
+            template<typename F>
+            auto operator()(F f) const -> decltype(f(__myT))
+            {
+                std::lock_guard<std::mutex> guard(this->__lock);
+                return f(__myT);                
+            }  
+
+        private:
+            mutable T __myT;
+            mutable std::mutex __lock;
     };
 }
 

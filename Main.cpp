@@ -7,16 +7,29 @@
 
 int main (int argc, char** argv)
 {
-    concurrent::queue<int, std::queue> myqueue;
-    int a = 5;
-    myqueue << a << 17;
+    {
+        // Testing queue
+        concurrent::queue<int, std::queue> myqueue;
+        int a = 5;
+        myqueue << a << 17;
+    }
 
-    concurrent::object<std::string> blub ("Hello World!");
+    {
+        // Testing sync object
+        concurrent::async_object<std::string> blub ("Hello World!");
+        auto res = blub( [](std::string& s) -> std::string{
+            return s + " omfg!";
+        }); 
+        std::cout << res.get() << std::endl;
+    }
 
-    auto res = blub( [](std::string& s) -> std::string{
-        return s + " omfg!";
-    });
+    {
+        // Testing sync object
+        concurrent::sync_object<std::string> blub("World Hello");
+        blub( [](std::string& s) -> void {
+            std::cout << s << std::endl;
+        });
+    }
 
-    std::cout << res.get() << std::endl;
     return 0;
 }
