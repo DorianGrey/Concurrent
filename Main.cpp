@@ -4,6 +4,7 @@
 #include <iostream>
 #include <queue>
 #include <string>
+#include "util/detect.hpp"
 
 int main (int argc, char** argv)
 {
@@ -29,6 +30,11 @@ int main (int argc, char** argv)
         blub( [](std::string& s) -> void {
             std::cout << s << std::endl;
         });
+    }
+
+    {
+        std::string s;
+        std::cout << detect::has_member_swap<std::string>::value << std::endl;
     }
 
     return 0;
