@@ -12,6 +12,7 @@
 #include "error_handling/expected.hpp"
 #include "queue.hpp"
 #include "util/detect.hpp"
+#include "util/member_swap.hpp"
 
 /************************************************************************/
 /* TODOS                                                                */
@@ -33,17 +34,76 @@ namespace concurrent
     class async_object
     {
         public:
+            /** \brief Default c'tor. If T has a default c'tor or can be constructed by uniform initialization, there is no need to give a particular instance.
+             *
+             * \param t T Value to handle inside this class.
+             */
             async_object(T t = T{}) : __myT(t), __workerThread([=]() -> void { __done = false; while (!__done) { this->__innerqueue.pop()(); }}) // Little complicated, but that's the horror we face due to s.th. like a pop() ...
             {
 
             }
 
+            /** \brief Copy c'tor. It sends a message to the rhs-object that ends up in a copy of its T value (either by copy-and-swap or not).
+             *
+             * \param rhs const async_object& Asynchronized object to copy from.
+             * \note If this c'tor can be used depends on T having a copy-c'tor or not - you will get a compile-error if it does not!
+             *       This c'tor will block until the rhs instance copied the requested value (i.e., it waits for the future value), so handle it with care!
+             */
+            async_object(const async_object& rhs)
+            {
+                static_assert( std::is_copy_constructible<T>::value, "T is not copy-constructable!" );
+                if (this != std::addressof(rhs))
+                {
+                    auto res = rhs->__innerqueue << ([&](T& value) -> void {
+                        // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
+                        // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
+                        // a simple assignment ( = ).
+                        if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, value.__myT);        
+                    });
+
+                    res.wait(); // Wait until the copy was assigned, otherwise, it may cause an unstable state.
+                }
+            }
+
+            /** \brief D'tor. It sends a message that causes the internal thread to run out and waits for it afterwards, thus, it may take some time until it is destructed correctly.
+             *
+             */
             ~async_object() 
             {
                 this->__innerqueue << ([=]() { __done = true; });
                 this->__workerThread.join();
             }
 
+            /** \brief Assignment operator
+             *
+             * \param rhs const async_object& Synchronized object to copy from.
+             * \return *this
+             * \note Using this function depends on T having a defined assignment operator or not - you will get a compile-error if it does not have one!
+             *       This assignment will block until the rhs instance copied the requested value (i.e., it waits for the future value), so handle it with care!
+             */
+            async_object& operator=(const async_object& rhs)
+            {
+                static_assert( std::is_copy_assignable<T>::value, "T is not copy-assignable!" );
+                if (this != std::addressof(rhs))
+                {
+                    auto res = rhs->__innerqueue << ([&](T& value) -> void {
+                        // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
+                        // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
+                        // a simple assignment ( = ).
+                        if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, value.__myT);        
+                    });
+
+                    res.wait(); // Wait until the copy was assigned, otherwise, it may cause an unstable state.
+                }                
+                return *this;
+            }
+
+             /** \brief Operator-function to post a functor that should be executed asynchronously using the internally stored object. 
+             *
+             * \param f F Functor to execute.
+             * \return Anything that the functor returns, as a std::future-value.
+             * \note This function will not block, if you need the result to go on, you will have to wait on the future-value!
+             */
             template<typename F>
             auto operator()(F f) const -> std::future<decltype(f(__myT))>
             {
@@ -53,7 +113,7 @@ namespace concurrent
                 this->__innerqueue << ([=]() -> void { 
                     try
                     {
-                        this->__set_value(*promisedRes, f, this->__myT);
+                        this->__set_value(*promisedRes, f);
                     }
                     catch (...)
                     {
@@ -70,16 +130,32 @@ namespace concurrent
             std::atomic_bool __done;                                                   /**< Indicator for the thread to run out */
             std::thread __workerThread;                                                /**< Worker thread */
             
-
-            template<typename Fut, typename F, typename T>
-            void __set_value(std::promise<Fut>& p, F& f, T& t) const 
+            /** \brief Helper function that sets the value resulting from a functor if that result is not void.
+             *         Separation is required due to std::future::set_value, which does not take a parameter when the result should be void.  
+             *
+             * \param Fut Type that is handled inside the given std::promise, i.e. the return-type of the functor.
+             * \param F Type of the functor.
+             * \param p std::promise<Fut>& Promise-value to write the result to; the result will be accessible to the future-value.
+             * \param f F& Functor to apply on the local T instance.
+             *
+             */
+            template<typename Fut, typename F>
+            void __set_value(std::promise<Fut>& p, F& f) const 
             {
-                p.set_value(f(t));
+                p.set_value(f(this->__myT));
             }
-            template<typename F, typename T>
-            void __set_value(std::promise<void>& p, F& f, T& t) const 
+
+            /** \brief Helper function that sets the value resulting from a functor if that result is void.
+             *         Separation is required due to std::future::set_value, which does not take a parameter when the result should be void. 
+             *
+             * \param F Type of the functor.
+             * \param p std::promise<void>& Promise-value to signal to.
+             * \param f F& Functor to apply on the local T instance.
+             */
+            template<typename F>
+            void __set_value(std::promise<void>& p, F& f) const 
             {
-                f(t);
+                f(this->__myT);
                 p.set_value();
             }
     };
@@ -103,7 +179,7 @@ namespace concurrent
 
             }
 
-            /** \brief Copy c'tor. It acquires the remote lock to ensure that no-one is currently modifying the internal data.
+            /** \brief Copy c'tor. It acquires the remote lock to ensure that no-one is currently modifying the internal data. (either by copy-and-swap or not)
              *
              * \param rhs const sync_object& Synchronized object to copy from.
              * \note If this c'tor can be used depends on T having a copy-c'tor or not - you will get a compile-error if it does not!
@@ -113,8 +189,11 @@ namespace concurrent
                 static_assert( std::is_copy_constructible<T>::value, "T is not copy-constructable!" );
                 if (this != std::addressof(rhs))
                 {
-                    std::lock_guard<std::mutex> guard(rhs.__lock); 
-                    this->__myT = rhs.__myT; // TODO: Hm... maybe there is another option: Potentially copy-and-swap-idiom! Should depend on member swap available for T.
+                    std::lock_guard<std::mutex> guard(rhs.__lock);
+                    // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
+                    // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
+                    // a simple assignment ( = ).
+                    if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, rhs.__myT);
                 }
             }
 
@@ -130,13 +209,18 @@ namespace concurrent
              *
              * \param rhs const sync_object& Synchronized object to copy from.
              * \return *this
+             * \note Using this function depends on T having a defined assignment operator or not - you will get a compile-error if it does not have one!
              */
             sync_object& operator=(const sync_object& rhs)
             {
+                static_assert( std::is_copy_assignable<T>::value, "T is not copy-assignable!" );
                 if (this != std::addressof(rhs))
                 {
                     std::lock_guard<std::mutex> guard(rhs.__lock); 
-                    this->__myT = rhs.__myT; // TODO: Hm... maybe there is another option: Potentially copy-and-swap-idiom! Should depend on member swap available for T.
+                    // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
+                    // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
+                    // a simple assignment ( = ).
+                    if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, rhs.__myT);
                 }                
                 return *this;
             }
