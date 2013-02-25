@@ -1,5 +1,6 @@
 #include "concurrent/object.hpp"
 #include "concurrent/queue.hpp"
+#include "concurrent/cow/CoW.hpp"
 
 #include <iostream>
 #include <queue>
@@ -8,26 +9,26 @@
 
 int main (int argc, char** argv)
 {
-    {
-        // Testing queue
+    {// Testing queue
+        
         concurrent::queue<int, std::queue> myqueue;
         int a = 5;
         myqueue << a << 17;
     }
 
-    {
-        // Testing sync object
+    {// Testing sync object
+        
         concurrent::async_object<std::string> blub ("Hello World!");
-        auto res = blub( [](std::string& s) -> std::string{
+        auto res = blub <= ( [](std::string& s) -> std::string{
             return s + " omfg!";
         }); 
         std::cout << res.get() << std::endl;
     }
 
-    {
-        // Testing sync object
+    {// Testing sync object
+        
         concurrent::sync_object<std::string> blub("World Hello");
-        blub( [](std::string& s) -> void {
+        blub <= ( [](std::string& s) -> void {
             std::cout << s << std::endl;
         });
     }
