@@ -105,7 +105,7 @@ namespace concurrent
              * \note This function will not block, if you need the result to go on, you will have to wait on the future-value!
              */
             template<typename F>
-            auto operator()(F f) const -> std::future<decltype(f(__myT))>
+            auto operator <= (F f) const -> std::future<decltype(f(__myT))>
             {
                 auto promisedRes = std::make_shared< std::promise<decltype(f(__myT))> >();
                 auto ret = promisedRes->get_future();
@@ -232,7 +232,7 @@ namespace concurrent
              * \note This function will block until the lock could be acquired.
              */
             template<typename F>
-            auto operator()(F f) const -> expected::value<decltype(f(__myT))>
+            auto operator <= (F f) const -> expected::value<decltype(f(__myT))>
             {
                 std::lock_guard<std::mutex> guard(this->__lock);
                 auto res = expected::result_of([&]() { return f(__myT); } );
