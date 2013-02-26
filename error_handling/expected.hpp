@@ -4,7 +4,7 @@
 #include <exception>
 #include <type_traits>
 
-#define WITH_CPP11_UNION 0 // Not yet supported by VS, thus disabled
+#define WITH_CPP11__UNION 0 // Not yet supported by VS, thus disabled
 
 /**
  * Based on Systematic Error Handling in C++, Andrei Alexandrescu
@@ -19,46 +19,46 @@ namespace expected
     class value
     {
         public:
-            value(const T& rhs) : ham(rhs), gotHam(true) {}
+            value(const T& rhs) : __data(rhs), __hasData(true) {}
 
-            value(T&& rhs) : ham(std::move(rhs)), gotHam(true) {}
+            value(T&& rhs) : __data(std::move(rhs)), __hasData(true) {}
 
-            value(const value& rhs) : gotHam(rhs.gotHam) 
+            value(const value& rhs) : __hasData(rhs.__hasData) 
             {
-                if (gotHam) 
-                    new(std::addressof(ham)) T(rhs.ham);
+                if (this->__hasData) 
+                    new(std::addressof(this->__data)) T(rhs.__data);
                 else 
-                    new(std::addressof(spam)) std::exception_ptr(rhs.spam);
+                    new(std::addressof(this->__excpt)) std::exception_ptr(rhs.__excpt);
             }
 
-            value(value&& rhs) : gotHam(rhs.gotHam) 
+            value(value&& rhs) : __hasData(rhs.gotHam) 
             {
-                if (gotHam) 
-                    new(std::addressof(ham)) T(std::move(rhs.ham));
+                if (this->__hasData) 
+                    new(std::addressof(this->__data)) T(std::move(rhs.ham));
                 else 
-                    new(std::addressof(spam)) std::exception_ptr(std::move(rhs.spam));
+                    new(std::addressof(this->__excpt)) std::exception_ptr(std::move(rhs.__excpt));
             }
 
             ~value() {}
 
             void swap(value& rhs) {
-                if (gotHam) {
-                    if (rhs.gotHam) {
+                if (this->__hasData) {
+                    if (rhs.__hasData) {
                         using std::swap;
-                        swap(ham, rhs.ham); // may call swap again
+                        swap(__data, rhs.__data); // may call swap again
                     } else {
-                        auto t = std::move(rhs.spam);
-                        new(std::addressof(rhs.ham)) T(std::move(ham));
-                        new(std::addressof(spam)) std::exception_ptr(t);
-                        std::swap(gotHam, rhs.gotHam);
+                        auto t = std::move(rhs.__excpt);
+                        new(std::addressof(rhs.__data)) T(std::move(__data));
+                        new(std::addressof(this->__excpt)) std::exception_ptr(t);
+                        std::swap(this->__hasData, rhs.__hasData);
                     }
                 } else {
-                    if (rhs.gotHam) {
+                    if (rhs.__hasData) {
                         rhs.swap(*this);
                     } else {
-                        std::swap(spam, rhs.spam); // inline function in <exception>
+                        std::swap(this->__excpt, rhs.__excpt); // inline function in <exception>
                         //spam.swap(rhs.spam);
-                        std::swap(gotHam, rhs.gotHam);
+                        std::swap(this->__hasData, rhs.__hasData);
                     }
                 }
             }
@@ -73,8 +73,8 @@ namespace expected
 
             static value<T> from_exception(std::exception_ptr p) {
                 value<T> result;
-                result.gotHam = false;
-                new(std::addressof(result.spam)) std::exception_ptr(std::move(p));
+                result.__hasData = false;
+                new(std::addressof(result.__excpt)) std::exception_ptr(std::move(p));
                 return result;
             }
 
@@ -83,23 +83,23 @@ namespace expected
             }
 
             bool valid() const {
-                return gotHam;
+                return this->__hasData;
             }
 
             T& get() {
-                if (!gotHam) std::rethrow_exception(spam);
-                return ham;
+                if (!this->__hasData) std::rethrow_exception(this->__excpt);
+                return this->__data;
             }
 
             const T& get() const {
-                if (!gotHam) std::rethrow_exception(spam);
-                return ham;
+                if (!this->__hasData) std::rethrow_exception(this->__excpt);
+                return this->__data;
             }
 
             template <typename E>
             bool hasException() const {
                 try {
-                    if (!gotHam) std::rethrow_exception(spam);
+                    if (!this->__hasData) std::rethrow_exception(this->__excpt);
                 } catch (const E& object) {
                     return true;
                 } catch (...) {
@@ -117,16 +117,16 @@ namespace expected
             }*/
 
         private:
-        #if WITH_CPP11_UNION !=0
+        #if WITH_CPP11__UNION !=0
             union 
             {
         #endif
-                T ham;
-                std::exception_ptr spam;
-        #if WITH_CPP11_UNION != 0
+                T __data;
+                std::exception_ptr __excpt;
+        #if WITH_CPP11__UNION != 0
             };
         #endif
-            bool gotHam;
+            bool __hasData;
             value() {}
     };
 
@@ -134,34 +134,34 @@ namespace expected
     class value<void>
     {
         public:
-            value(void) : gotHam(true) {}
-            value(const value& rhs) : gotHam(rhs.gotHam) 
+            value(void) : __hasData(true) {}
+            value(const value& rhs) : __hasData(rhs.__hasData) 
             {
-                if (!gotHam) 
-                    new(std::addressof(spam)) std::exception_ptr(rhs.spam);
+                if (!this->__hasData) 
+                    new(std::addressof(this->__excpt)) std::exception_ptr(rhs.__excpt);
             }
 
-            value(value&& rhs) : gotHam(rhs.gotHam) 
+            value(value&& rhs) : __hasData(rhs.__hasData) 
             {
-                if (!gotHam) 
-                    new(std::addressof(spam)) std::exception_ptr(std::move(rhs.spam));
+                if (!this->__hasData) 
+                    new(std::addressof(this->__excpt)) std::exception_ptr(std::move(rhs.__excpt));
             }
 
             ~value() {}
 
             void swap(value& rhs) {
-                if (gotHam) {
-                    if (!rhs.gotHam) {
-                        auto t = std::move(rhs.spam);
-                        new(std::addressof(spam)) std::exception_ptr(t);
-                        std::swap(gotHam, rhs.gotHam);
+                if (this->__hasData) {
+                    if (!rhs.__hasData) {
+                        auto t = std::move(rhs.__excpt);
+                        new(std::addressof(this->__excpt)) std::exception_ptr(t);
+                        std::swap(this->__hasData, rhs.__hasData);
                     }
                 } else {
-                    if (rhs.gotHam) {
+                    if (rhs.__hasData) {
                         rhs.swap(*this);
                     } else {
-                        std::swap(spam, rhs.spam); // inline function in <exception>
-                        std::swap(gotHam, rhs.gotHam);
+                        std::swap(this->__excpt, rhs.__excpt); // inline function in <exception>
+                        std::swap(this->__hasData, rhs.__hasData);
                     }
                 }
             }
@@ -176,8 +176,8 @@ namespace expected
 
             static value<void> from_exception(std::exception_ptr p) {
                 value<void> result;
-                result.gotHam = false;
-                new(std::addressof(result.spam)) std::exception_ptr(std::move(p));
+                result.__hasData = false;
+                new(std::addressof(result.__excpt)) std::exception_ptr(std::move(p));
                 return result;
             }
 
@@ -186,13 +186,13 @@ namespace expected
             }
 
             bool valid() const {
-                return gotHam;
+                return __hasData;
             }
 
             template <typename E>
             bool hasException() const {
                 try {
-                    if (!gotHam) std::rethrow_exception(spam);
+                    if (!this->__hasData) std::rethrow_exception(this->__excpt);
                 } catch (const E& object) {
                     return true;
                 } catch (...) {
@@ -201,8 +201,8 @@ namespace expected
             }
 
         private:
-            std::exception_ptr spam;
-            bool gotHam;
+            std::exception_ptr __excpt;
+            bool __hasData;
     };
 
     namespace detail
@@ -238,11 +238,8 @@ namespace expected
         }
     }
 
-}
+}  
 
+#undef WITH_CPP11__UNION
 
-
-
-
-
-#endif
+#endif // __EXPECTED_HPP__

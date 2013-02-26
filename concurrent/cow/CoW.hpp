@@ -1,5 +1,5 @@
-#ifndef __COW_HPP
-#define __COW_HPP
+#ifndef __COW_HPP__
+#define __COW_HPP__
 
 #include "internal/cloner.hpp"
 #include <memory>
@@ -84,4 +84,4 @@ namespace concurrent
 
 
 
-#endif
+#endif // __COW_HPP__

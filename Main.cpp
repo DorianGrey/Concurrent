@@ -2,6 +2,8 @@
 #include "concurrent/queue.hpp"
 #include "concurrent/cow/CoW.hpp"
 
+#include "error_handling/scope_guard.hpp"
+
 #include <iostream>
 #include <queue>
 #include <string>
@@ -36,6 +38,12 @@ int main (int argc, char** argv)
     {
         std::string s;
         std::cout << detect::has_member_swap<std::string>::value << std::endl;
+    }
+
+    {
+        auto scoper = scope_guard::make([]() -> void { std::cout << "Scoper down!" << std::endl; });
+        !scoper;  // Disable the guard!
+        !scoper;  // Enable the guard again!
     }
 
     return 0;
