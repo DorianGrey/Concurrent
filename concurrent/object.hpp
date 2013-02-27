@@ -16,7 +16,8 @@
 
 /************************************************************************/
 /* TODOS                                                                */
-/* - Deal with potential race condition in async's copy/move c'tor      */
+/* - Potential race condition copy/move ?                               */
+/* - What about open jobs in the moved-from objects ?                   */
 /* - more tests                                                         */
 /* - documentation                                                      */
 /************************************************************************/
@@ -58,10 +59,10 @@ namespace concurrent
                         // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
                         // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                         // a simple assignment ( = ).
-                        if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, value.__myT);        
+                        if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, value);                               
                     });
-
-                    res.wait(); // Wait until the copy was assigned, otherwise, it may cause an unstable state.
+                    res.wait(); // Wait for stable state
+                    res.get(); // just to get the exception if one occurred!
                 }
             }
 
@@ -78,10 +79,10 @@ namespace concurrent
                 if (this != std::addressof(rhs))
                 {
                     auto res = rhs->__innerqueue << ([&](T& value) -> void {
-                        this->__myT = std::move(value);       
+                        this->__myT = std::move(value);                            
                     });
-
-                    res.wait(); // Wait until the copy was assigned, otherwise, it may cause an unstable state.
+                    res.wait(); // Wait for stable state
+                    res.get(); // just to get the exception if one occurred!
                 }
             }
 
@@ -111,10 +112,10 @@ namespace concurrent
                         // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
                         // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                         // a simple assignment ( = ).
-                        if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, value.__myT);        
+                        if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, value);                               
                     });
-
-                    res.wait(); // Wait until the copy was assigned, otherwise, it may cause an unstable state.
+                    res.wait(); // Wait for stable state
+                    res.get(); // just to get the exception if one occured!
                 }                
                 return *this;
             }
@@ -133,10 +134,10 @@ namespace concurrent
                 if (this != std::addressof(rhs))
                 {
                     auto res = rhs->__innerqueue << ([&](T& value) -> void {
-                        this->__myT = std::move(value);       
+                        this->__myT = std::move(value);                            
                     });
-
-                    res.wait(); // Wait until the move was assigned, otherwise, it may cause an unstable state.
+                    res.wait(); // Wait for stable state
+                    res.get(); // just to get the exception if one occurred!
                 }                
                 return *this;
             }
