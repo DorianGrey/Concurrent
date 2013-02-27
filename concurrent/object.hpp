@@ -27,6 +27,9 @@ namespace concurrent
      *         As a result, all return values are futures.
      *         It is based upon the concurrent<T> class presented by Herb Sutter.
      *         http://channel9.msdn.com/Shows/Going+Deep/C-and-Beyond-2012-Herb-Sutter-Concurrency-and-Parallelism
+     *         Moving in an asynchronous object is rather complicated. Theoretically, we should move any open jobs, but that's not possible, due to their boundaries.
+     *         Besides, data cannot be moved as long as it is (theoretically) modified. Considering this, moving is only possible when an object is not currently 
+     *         in modification. Thus, we have to let the other object run any job left (same as in its d'tor), and fetch the data object afterwards. 
      *
      *  \param Data-type that should be covered by this class.
      */
@@ -77,12 +80,9 @@ namespace concurrent
                 static_assert( std::is_move_constructible<T>::value, "T is not move-constructible!" );
                 if (this != std::addressof(rhs))
                 {
-                    rhs.__innerqueue.clear();
-                    auto res = rhs->__innerqueue << ([&](T& value) -> void {
-                        this->__myT = std::move(value);                            
-                    });
-                    res.wait(); // Wait for stable state
-                    res.get(); // just to get the exception if one occurred!
+                    rhs.__innerqueue << ([=]() { rhs.__done = true; });
+                    rhs.__workerThread.join();
+                    this->__myT = std::move(rhs.__myT);
                 }
             }
 
@@ -133,12 +133,9 @@ namespace concurrent
                 static_assert( std::is_move_assignable<T>::value, "T is not move-assignable!" );
                 if (this != std::addressof(rhs))
                 {
-                    rhs.__innerqueue.clear();
-                    auto res = rhs->__innerqueue << ([&](T& value) -> void {
-                        this->__myT = std::move(value);                            
-                    });
-                    res.wait(); // Wait for stable state
-                    res.get(); // just to get the exception if one occurred!
+                    rhs.__innerqueue << ([=]() { rhs.__done = true; });
+                    rhs.__workerThread.join();
+                    this->__myT = std::move(rhs.__myT);
                 }                
                 return *this;
             }
@@ -151,7 +148,7 @@ namespace concurrent
              */
             template<typename F>
             auto operator <= (F f) const -> std::future<decltype(f(__myT))>
-            {
+            {              
                 auto promisedRes = std::make_shared< std::promise<decltype(f(__myT))> >();
                 auto ret = promisedRes->get_future();
 
@@ -164,7 +161,7 @@ namespace concurrent
                     {
                         promisedRes->set_exception(std::make_exception_ptr("Uh oh..."));
                     }
-                });
+                });                
                 return ret;
             }
 
