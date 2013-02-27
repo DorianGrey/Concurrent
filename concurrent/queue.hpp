@@ -17,6 +17,7 @@ namespace concurrent
      *         Note that any container you use has to implement either the queue policy (here: push(T),
      *         pop(), front(), empty() ) directly or has to adopt the queue internals, like shown in
      *         http://www.cplusplus.com/reference/stl/queue/ .
+     *         Also, using std::swap on it should be supported.
      *         I.e., by default, deque and list are implementing this, like
      *         template < class T, class Container = std::deque<T> > class queue
      *         template < class T, class Container = std::list<T> > class queue .
@@ -92,6 +93,13 @@ namespace concurrent
                 auto destination = this->__storage.front();
                 this->__storage.pop();
                 return destination;
+            }
+
+            void clear()
+            {
+                std::unique_lock<std::mutex> lock(this->__accessMutex);
+                Storage<MsgType, OptArgs...> empty; // empty storage
+                std::swap(this->__storage, empty);
             }
 
         private:

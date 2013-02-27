@@ -16,8 +16,7 @@
 
 /************************************************************************/
 /* TODOS                                                                */
-/* - Potential race condition copy/move ?                               */
-/* - What about open jobs in the moved-from objects ?                   */
+/* - Check for potential race condition copy/move                       */
 /* - more tests                                                         */
 /* - documentation                                                      */
 /************************************************************************/
@@ -78,6 +77,7 @@ namespace concurrent
                 static_assert( std::is_move_constructible<T>::value, "T is not move-constructible!" );
                 if (this != std::addressof(rhs))
                 {
+                    rhs.__innerqueue.clear();
                     auto res = rhs->__innerqueue << ([&](T& value) -> void {
                         this->__myT = std::move(value);                            
                     });
@@ -133,6 +133,7 @@ namespace concurrent
                 static_assert( std::is_move_assignable<T>::value, "T is not move-assignable!" );
                 if (this != std::addressof(rhs))
                 {
+                    rhs.__innerqueue.clear();
                     auto res = rhs->__innerqueue << ([&](T& value) -> void {
                         this->__myT = std::move(value);                            
                     });
@@ -142,7 +143,7 @@ namespace concurrent
                 return *this;
             }
 
-             /** \brief Operator-function to post a functor that should be executed asynchronously using the internally stored object. 
+            /** \brief Operator-function to post a functor that should be executed asynchronously using the internally stored object. 
              *
              * \param f F Functor to execute.
              * \return Anything that the functor returns, as a std::future-value.
