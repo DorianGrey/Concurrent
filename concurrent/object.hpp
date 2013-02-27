@@ -16,7 +16,7 @@
 
 /************************************************************************/
 /* TODOS                                                                */
-/* - Deal with copy + move c'tor                                        */
+/* - Deal with potential race condition in async's copy/move c'tor      */
 /* - more tests                                                         */
 /* - documentation                                                      */
 /************************************************************************/
@@ -51,7 +51,7 @@ namespace concurrent
              */
             async_object(const async_object& rhs)
             {
-                static_assert( std::is_copy_constructible<T>::value, "T is not copy-constructable!" );
+                static_assert( std::is_copy_constructible<T>::value, "T is not copy-constructible!" );
                 if (this != std::addressof(rhs))
                 {
                     auto res = rhs->__innerqueue << ([&](T& value) -> void {
@@ -59,6 +59,26 @@ namespace concurrent
                         // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                         // a simple assignment ( = ).
                         if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, value.__myT);        
+                    });
+
+                    res.wait(); // Wait until the copy was assigned, otherwise, it may cause an unstable state.
+                }
+            }
+
+            /** \brief Move c'tor. It sends a message to the rhs-object that ends up in a move of its T value.
+             *
+             * \param rhs async_object&& Asynchronized object to move from.
+             * \note If this c'tor can be used depends on T having a move-c'tor or not - you will get a compile-error if it does not!
+             *       This c'tor will block until the rhs instance move the requested value (i.e., it waits for the future value), so handle it with care!
+             *       The effect on rhs depends on the effect defined on its T value's move-c'tor!
+             */
+            async_object(async_object&& rhs)
+            {
+                static_assert( std::is_move_constructible<T>::value, "T is not move-constructible!" );
+                if (this != std::addressof(rhs))
+                {
+                    auto res = rhs->__innerqueue << ([&](T& value) -> void {
+                        this->__myT = std::move(value);       
                     });
 
                     res.wait(); // Wait until the copy was assigned, otherwise, it may cause an unstable state.
@@ -80,6 +100,7 @@ namespace concurrent
              * \return *this
              * \note Using this function depends on T having a defined assignment operator or not - you will get a compile-error if it does not have one!
              *       This assignment will block until the rhs instance copied the requested value (i.e., it waits for the future value), so handle it with care!
+             *       The effect on rhs depends on the effect defined on its T value's move-c'tor!
              */
             async_object& operator=(const async_object& rhs)
             {
@@ -94,6 +115,28 @@ namespace concurrent
                     });
 
                     res.wait(); // Wait until the copy was assigned, otherwise, it may cause an unstable state.
+                }                
+                return *this;
+            }
+
+            /** \brief Assignment operator
+             *
+             * \param rhs async_object&& Synchronized object to move from.
+             * \return *this
+             * \note Using this function depends on T having a defined move-assignment operator or not - you will get a compile-error if it does not have one!
+             *       This assignment will block until the rhs instance moved the requested value (i.e., it waits for the future value), so handle it with care!
+             *       The effect on rhs depends on the effect defined on its T value's move-assignment operator!
+             */
+            async_object& operator=(async_object&& rhs)
+            {
+                static_assert( std::is_move_assignable<T>::value, "T is not move-assignable!" );
+                if (this != std::addressof(rhs))
+                {
+                    auto res = rhs->__innerqueue << ([&](T& value) -> void {
+                        this->__myT = std::move(value);       
+                    });
+
+                    res.wait(); // Wait until the move was assigned, otherwise, it may cause an unstable state.
                 }                
                 return *this;
             }
@@ -186,14 +229,32 @@ namespace concurrent
              */
             sync_object(const sync_object& rhs)
             {
-                static_assert( std::is_copy_constructible<T>::value, "T is not copy-constructable!" );
+                static_assert( std::is_copy_constructible<T>::value, "T is not copy-constructible!" );
                 if (this != std::addressof(rhs))
                 {
                     std::lock_guard<std::mutex> guard(rhs.__lock);
+                    std::lock_guard<std::mutex> guard(this->__lock);
                     // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
                     // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                     // a simple assignment ( = ).
                     if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, rhs.__myT);
+                }
+            }
+
+            /** \brief Move c'tor. It acquires the remote lock to ensure that no-one is currently modifying the internal data. 
+             *
+             * \param rhs sync_object&& Synchronized object to move from.
+             * \note If this c'tor can be used depends on T having a copy-c'tor or not - you will get a compile-error if it does not!
+             *       The effect on rhs depends on the effect defined on its T value's move-c'tor!   
+             */
+            sync_object(sync_object&& rhs)
+            {
+                static_assert( std::is_move_constructible<T>::value, "T is not move-constructible!" );
+                if (this != std::addressof(rhs))
+                {
+                    std::lock_guard<std::mutex> guard(rhs.__lock);
+                    std::lock_guard<std::mutex> guard(this->__lock);
+                    this->__myT = std::move(rhs.__myT);
                 }
             }
 
@@ -221,6 +282,23 @@ namespace concurrent
                     // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                     // a simple assignment ( = ).
                     if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, rhs.__myT);
+                }                
+                return *this;
+            }
+
+            /** \brief Assignment operator
+             *
+             * \param rhs sync_object&& Synchronized object to move from.
+             * \return *this
+             * \note Using this function depends on T having a defined move-assignment operator or not - you will get a compile-error if it does not have one!
+             */
+            sync_object& operator=(sync_object&& rhs)
+            {
+                static_assert( std::is_move_assignable<T>::value, "T is not move-assignable!" );
+                if (this != std::addressof(rhs))
+                {
+                    std::lock_guard<std::mutex> guard(rhs.__lock); 
+                    this->__myT = std::move(rhs.__myT);
                 }                
                 return *this;
             }
