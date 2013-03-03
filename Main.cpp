@@ -3,11 +3,12 @@
 #include "concurrent/cow/CoW.hpp"
 
 #include "error_handling/scope_guard.hpp"
+#include "tests/test_channel.hpp"
+#include "util/detect.hpp"
 
 #include <iostream>
 #include <queue>
-#include <string>
-#include "util/detect.hpp"
+#include <string> 
 
 int main (int argc, char** argv)
 {
@@ -44,6 +45,16 @@ int main (int argc, char** argv)
         auto scoper = scope_guard::make([]() -> void { std::cout << "Scoper down!" << std::endl; });
         !scoper;  // Disable the guard!
         !scoper;  // Enable the guard again!
+    }
+
+    {
+        auto scoper = scope_guard::make([](){ std::cout << "Scoper activated!" << std::endl; }, [](){ std::cout << "Scoper dead!" << std::endl; });
+        auto res = ~scoper;
+        if (res.valid()) !scoper;        
+    }
+
+    {
+        conc_test::channels::main();
     }
 
     return 0;
