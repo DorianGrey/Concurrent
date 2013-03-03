@@ -1,10 +1,8 @@
 #include "concurrent/object.hpp"
 #include "concurrent/queue.hpp"
-#include "concurrent/cow/CoW.hpp"
 
-#include "error_handling/scope_guard.hpp"
 #include "tests/test_channel.hpp"
-#include "util/detect.hpp"
+#include "tests/test_scopeguard.hpp"
 
 #include <iostream>
 #include <queue>
@@ -16,7 +14,7 @@ int main (int argc, char** argv)
         
         concurrent::queue<int, std::queue> myqueue;
         int a = 5;
-        myqueue << a << 17;
+        myqueue.push(a).push(17);
     }
 
     {// Testing sync object
@@ -36,26 +34,8 @@ int main (int argc, char** argv)
         });
     }
 
-    {
-        std::string s;
-        std::cout << detect::has_member_swap<std::string>::value << std::endl;
-    }
-
-    {
-        auto scoper = scope_guard::make([]() -> void { std::cout << "Scoper down!" << std::endl; });
-        !scoper;  // Disable the guard!
-        !scoper;  // Enable the guard again!
-    }
-
-    {
-        auto scoper = scope_guard::make([](){ std::cout << "Scoper activated!" << std::endl; }, [](){ std::cout << "Scoper dead!" << std::endl; });
-        auto res = ~scoper;
-        if (res.valid()) !scoper;        
-    }
-
-    {
-        conc_test::channels::main();
-    }
+    conc_test::channels::main();
+    conc_test::scope_guards::main();
 
     return 0;
 }

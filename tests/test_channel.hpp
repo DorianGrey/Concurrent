@@ -18,7 +18,7 @@ namespace conc_test
         */
         void Example1(std::uint32_t numRuns)
         {
-            Channel<float> chan;
+            concurrent::channel<float> chan;
             std::mutex coutmutex;
             std::thread t1([&chan, numRuns, &coutmutex]() -> void
             {
@@ -58,7 +58,7 @@ namespace conc_test
         */
         void Example2(std::uint32_t numRuns)
         {
-            auto chan = make_chan<int>();
+            auto chan = concurrent::make_chan<int>();
             std::mutex coutmutex;
             std::thread t1([&chan, numRuns, &coutmutex]() -> void
             {
@@ -95,7 +95,7 @@ namespace conc_test
         Example 3: Create a shared-ptr-channel, handle it over to two threads, and go ahead.
         */       
 
-        void Example3_Task1(Chan<double> channel, std::uint32_t numRuns)
+        void Example3_Task1(concurrent::chan<double> channel, std::uint32_t numRuns)
         {
             double msgBase = 5.3;
             while (numRuns-- > 0)
@@ -107,7 +107,7 @@ namespace conc_test
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }
         }
-        void Example3_Task2(Chan<double> channel, std::uint32_t numRuns)
+        void Example3_Task2(concurrent::chan<double> channel, std::uint32_t numRuns)
         {
             double res = 0.0;
             while (numRuns-- > 0)
@@ -121,14 +121,14 @@ namespace conc_test
 
         void Example3(std::uint32_t numRuns)
         {
-            auto chan = make_chan<double>();
+            auto chan = concurrent::make_chan<double>();
             std::thread t1(Example3_Task1, chan, numRuns);
             std::thread t2(Example3_Task2, chan, numRuns);
             t1.join();
             t2.join();
         }
 
-        int main()
+        void main()
         {
             // Running test 1
             std::cout << "[Test 1] Directly instantiating channel... " << std::endl;
@@ -144,7 +144,6 @@ namespace conc_test
             std::cout << "[Test 3] Instantiating channel and copy by default... " << std::endl;
             Example3(10);
             std::cout << "[Test 3] Completed. " << std::endl;
-            return 0;
         }
     }
 }

@@ -57,7 +57,7 @@ namespace concurrent
                 static_assert( std::is_copy_constructible<T>::value, "T is not copy-constructible!" );
                 if (this != std::addressof(rhs))
                 {
-                    auto res = rhs->__innerqueue << ([&](T& value) -> void {
+                    auto res = rhs->__innerqueue.push([&](T& value) -> void {
                         // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
                         // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                         // a simple assignment ( = ).
@@ -80,7 +80,7 @@ namespace concurrent
                 static_assert( std::is_move_constructible<T>::value, "T is not move-constructible!" );
                 if (this != std::addressof(rhs))
                 {
-                    rhs.__innerqueue << ([=]() { rhs.__done = true; });
+                    rhs.__innerqueue.push([=]() { rhs.__done = true; });
                     rhs.__workerThread.join();
                     this->__myT = std::move(rhs.__myT);
                 }
@@ -91,7 +91,7 @@ namespace concurrent
              */
             ~async_object() 
             {
-                this->__innerqueue << ([=]() { __done = true; });
+                this->__innerqueue.push([=]() { __done = true; });
                 this->__workerThread.join();
             }
 
@@ -108,7 +108,7 @@ namespace concurrent
                 static_assert( std::is_copy_assignable<T>::value, "T is not copy-assignable!" );
                 if (this != std::addressof(rhs))
                 {
-                    auto res = rhs->__innerqueue << ([&](T& value) -> void {
+                    auto res = rhs->__innerqueue.push([&](T& value) -> void {
                         // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
                         // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                         // a simple assignment ( = ).
@@ -133,7 +133,7 @@ namespace concurrent
                 static_assert( std::is_move_assignable<T>::value, "T is not move-assignable!" );
                 if (this != std::addressof(rhs))
                 {
-                    rhs.__innerqueue << ([=]() { rhs.__done = true; });
+                    rhs.__innerqueue.push([=]() { rhs.__done = true; });
                     rhs.__workerThread.join();
                     this->__myT = std::move(rhs.__myT);
                 }                
@@ -152,7 +152,7 @@ namespace concurrent
                 auto promisedRes = std::make_shared< std::promise<decltype(f(__myT))> >();
                 auto ret = promisedRes->get_future();
 
-                this->__innerqueue << ([=]() -> void { 
+                this->__innerqueue.push([=]() -> void { 
                     try
                     {
                         this->__set_value(*promisedRes, f);
@@ -168,7 +168,7 @@ namespace concurrent
 
         private:             
             mutable T __myT;                                                           /**< Value that should be modifiable through any executed functor */
-            mutable concurrent::queue<std::function<void()>, std::queue> __innerqueue; /**< Internally synchronized queue */
+            mutable concurrent::queue<std::function<void()>> __innerqueue;             /**< Internally synchronized queue */
             std::atomic_bool __done;                                                   /**< Indicator for the thread to run out */
             std::thread __workerThread;                                                /**< Worker thread */
             

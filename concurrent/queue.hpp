@@ -24,21 +24,21 @@ namespace concurrent
      *  \param OptArgs Optional arguments that are getting passed to the storage template declaration,
      *         e.g. for a custom allocator.
      */
-    template<typename MsgType, template<typename...> class Storage, typename... OptArgs>
+    template<typename MsgType, template<typename, typename...> class Storage = std::queue, typename... OptArgs>
     class queue
     {
         public:
             queue(){};
             ~queue(){};
 
-            /** \brief Stream-style function that adds a message to the queue. Message is taken as reference.
+            /** \brief Function that adds a message to the queue. Message is taken as reference.
             *
             * \param msg const MsgType Message to be added to the queue.
             * \return *this
             *
             * \note Function blocks until thread-safe access to the queue is possible.
             */
-            queue& operator<<(const MsgType& msg)
+            queue& push(const MsgType& msg)
             {
                 std::unique_lock<std::mutex> lock(this->__accessMutex); // Since std::queue is not thread-safe, we need the lock here.
                 this->__storage.push(msg);
@@ -46,14 +46,14 @@ namespace concurrent
                 return *this;
             }
 
-            /** \brief Stream-style function that adds a message to the message-queue. Message is taken as r-value.
+            /** \brief Function that adds a message to the message-queue. Message is taken as r-value.
             *
             * \param msg MsgType&& Message to be added to the queue.
             * \return *this
             *
             * \note Function blocks until thread-safe access to the queue is possible.
             */
-            queue& operator<<(MsgType&& msg)
+            queue& push(MsgType&& msg)
             {
                 std::unique_lock<std::mutex> lock(this->__accessMutex);
                 this->__storage.push(msg);
@@ -61,27 +61,12 @@ namespace concurrent
                 return *this;
             }
 
-            /** \brief Stream-like function that takes the next available message from the internal message queue.
+            /** \brief Function that takes the next available message from the internal message queue.
              *
              * \param destination MsgType& Variable to write the message to.
              * \return *this
              *
              * \note Function blocks until thread-safe access to the queue is possible and at least one message arrived.
-             */
-            queue& operator>>(MsgType& destination)
-            {
-                std::unique_lock<std::mutex> lock(this->__accessMutex); // Since std::queue is not thread-safe, we need the lock here.
-                this->__waitCondition.wait(lock, [this]()->bool         // We have to wait for the given condition after getting the lock granted.
-                {
-                    return !this->__storage.empty();
-                });
-                destination = this->__storage.front();
-                this->__storage.pop();
-                return *this;
-            }
-
-            /** \brief Second option to retrieve something from the list - is a little shorter for the caller
-             *
              */
             MsgType pop()
             {
