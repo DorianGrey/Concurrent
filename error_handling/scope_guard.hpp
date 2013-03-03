@@ -1,6 +1,8 @@
 #ifndef __SCOPE_GUARD_HPP__
 #define __SCOPE_GUARD_HPP__
 
+#include "expected.hpp"
+
 #define WITH_CPP_11__CTOR_DISABLING 0  // explicit deletion is preferable, but not yet supported by VS
 
 /**
@@ -51,10 +53,64 @@ namespace scope_guard
         #endif    
     };
 
+    template<typename Functor1, typename Functor2>
+    class do_undo
+    {
+        private:    
+            Functor1 __do;
+            Functor2 __undo;
+
+        public:
+            do_undo(Functor1 f1, Functor2 f2) : __isActive(true), __do(f1), __undo(f2) {}
+            do_undo(do_undo&& rhs) : __isActive(rhs.__isActive), __do(rhs.__do), __undo(rhs.__undo)
+            {
+                rhs.__isActive = false; // disable the other to prevent its execution!
+            }
+
+            ~do_undo()
+            {
+                if (this->__isActive)
+                {
+                    try
+                    {
+                        this->__undo();
+                    }
+                    catch (...) {}  // don't like any exception here
+                }
+            }
+            
+            auto operator~() -> decltype(expected::result_of<Functor1>(__do))
+            {
+                return expected::result_of<Functor1>(__do);   
+            } 
+
+            void operator!() // Uses toggle mode, might be useful in several cases
+            {
+                this->__isActive = !this->__isActive;
+            }
+
+        private:
+            bool __isActive;
+            
+        #if WITH_CPP_11__CTOR_DISABLING != 0
+            do_undo(const do_undo& rhs) = delete;
+            do_undo& operator=(const do_undo& rhs) = delete;
+        #else
+            do_undo(const do_undo& rhs);
+            do_undo& operator=(const do_undo& rhs);
+        #endif
+    };
+
     template<typename Functor>
     simple<Functor> make(Functor f)
     {
         return simple<Functor>(f);
+    }
+
+    template<typename Functor1, typename Functor2>
+    do_undo<Functor1, Functor2> make(Functor1 f1, Functor2 f2)
+    {
+        return do_undo<Functor1, Functor2>(f1, f2);
     }
 }
 
