@@ -18,7 +18,7 @@ namespace scope_guard
     class simple
     {
         public:
-            simple(Functor fu) : __isActive(true), __f(fu) {}
+            simple(Functor&& fu) : __isActive(true), __f(fu) {}
             simple(simple&& rhs) : __isActive(rhs.__isActive), __f(rhs.__f)
             {
                 rhs.__isActive = false; // disable the other to prevent its execution!
@@ -61,7 +61,7 @@ namespace scope_guard
             Functor2 __undo;
 
         public:
-            do_undo(Functor1 f1, Functor2 f2) : __isActive(true), __do(f1), __undo(f2) {}
+            do_undo(Functor1&& f1, Functor2&& f2) : __isActive(true), __do(f1), __undo(f2) {}
             do_undo(do_undo&& rhs) : __isActive(rhs.__isActive), __do(rhs.__do), __undo(rhs.__undo)
             {
                 rhs.__isActive = false; // disable the other to prevent its execution!
@@ -102,15 +102,15 @@ namespace scope_guard
     };
 
     template<typename Functor>
-    simple<Functor> make(Functor f)
+    simple<Functor> make(Functor&& f)
     {
-        return simple<Functor>(f);
+        return simple<Functor>(std::forward<Functor&&>(f));
     }
 
     template<typename Functor1, typename Functor2>
-    do_undo<Functor1, Functor2> make(Functor1 f1, Functor2 f2)
+    do_undo<Functor1, Functor2> make(Functor1&& f1, Functor2&& f2)
     {
-        return do_undo<Functor1, Functor2>(f1, f2);
+        return do_undo<Functor1, Functor2>(std::forward<Functor1&& >(f1), std::forward<Functor2&&>(f2));
     }
 }
 
