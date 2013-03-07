@@ -18,8 +18,8 @@ namespace scope_guard
     class simple
     {
         public:
-            simple(Functor&& fu) : __isActive(true), __f(fu) {}
-            simple(simple&& rhs) : __isActive(rhs.__isActive), __f(rhs.__f)
+            simple(Functor&& fu) : __isActive(true), __f(std::forward<Functor&&>(fu)) {}
+            simple(simple&& rhs) : __isActive(rhs.__isActive), __f(std::move(rhs.__f))
             {
                 rhs.__isActive = false; // disable the other to prevent its execution!
             }
@@ -61,8 +61,8 @@ namespace scope_guard
             Functor2 __undo;
 
         public:
-            do_undo(Functor1&& f1, Functor2&& f2) : __isActive(true), __do(f1), __undo(f2) {}
-            do_undo(do_undo&& rhs) : __isActive(rhs.__isActive), __do(rhs.__do), __undo(rhs.__undo)
+            do_undo(Functor1&& f1, Functor2&& f2) : __isActive(true), __do(std::forward<Functor1&&>(f1)), __undo(std::forward<Functor2&&>(f2)) {}
+            do_undo(do_undo&& rhs) : __isActive(rhs.__isActive), __do(std::move(rhs.__do)), __undo(std::move(rhs.__undo))
             {
                 rhs.__isActive = false; // disable the other to prevent its execution!
             }

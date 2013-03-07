@@ -5,6 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <type_traits>
 
 namespace concurrent
 {
@@ -27,6 +28,8 @@ namespace concurrent
     template<typename MsgType, template<typename, typename...> class Storage = std::queue, typename... OptArgs>
     class queue
     {
+        static_assert( std::is_copy_constructible<MsgType>::value, "The message type requires to be copy-constructible!" );
+
         public:
             queue(){};
             ~queue(){};
