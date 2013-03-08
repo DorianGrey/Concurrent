@@ -10,6 +10,26 @@ namespace conc_test
 {
     namespace sync_object
     {
+        void test_move()
+        {
+            concurrent::sync_object<std::string> blub ("Hello World!");
+            concurrent::sync_object<std::string> blub2 ("Hello Ape!");
+            blub2 = std::move(blub);
+            blub2 <= ( [](std::string& s) -> void {
+                std::cout <<  s << std::endl;
+            });
+        }
+
+        void test_copy()
+        {
+            concurrent::sync_object<std::string> blub ("Hello World!");
+            concurrent::sync_object<std::string> blub2 ("Hello Ape!");
+            blub = blub2;
+            blub <= ( [](std::string& s) -> void {
+                std::cout <<  s << std::endl;
+            });
+        }
+
         struct foo_functor_side
         {
             void operator()(std::string& s) const 
@@ -35,8 +55,8 @@ namespace conc_test
             // testing with functor struct.
             blub <= foo_functor_side();
 
-            blub <= ( [](std::string& s) -> void{
-                std::cout << "<Test result>" << s << std::endl;
+            blub <= ( [](std::string& s) -> void {
+                std::cout << "<Test result> " << s << std::endl;
             }); 
         }
 
@@ -73,6 +93,12 @@ namespace conc_test
 
             std::cout << "[:: Test 2: Call with side effects. ::]" << std::endl;
             test_side_effects();
+
+            std::cout << "[:: Test 3: Copy stuff. ::]" << std::endl;
+            test_copy();
+
+            std::cout << "[:: Test 4: Move stuff. ::]" << std::endl;
+            test_move();
         }
     }
 }

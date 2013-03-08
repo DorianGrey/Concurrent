@@ -61,7 +61,7 @@ namespace concurrent
                         // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
                         // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                         // a simple assignment ( = ).
-                        if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, value);                               
+                        if_member_swap< detect::has_member_swap<T>::value, T >::exec(this->__myT, value);                               
                     });
                     res.wait(); // Wait for stable state
                     res.get(); // just to get the exception if one occurred!
@@ -92,7 +92,11 @@ namespace concurrent
             ~async_object() 
             {
                 this->__innerqueue.push([=]() { __done = true; });
-                this->__workerThread.join();
+                try
+                {
+                    this->__workerThread.join(); // [Note] We don't want any exception here. E.g., it may occur by joining an already finished thread.
+                }
+                catch (...) {}
             }
 
             /** \brief Assignment operator
@@ -108,11 +112,11 @@ namespace concurrent
                 static_assert( std::is_copy_assignable<T>::value, "T is not copy-assignable!" );
                 if (this != std::addressof(rhs))
                 {
-                    auto res = rhs->__innerqueue.push([&](T& value) -> void {
+                    auto res = rhs <= ([&](T& value) -> void {
                         // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
                         // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                         // a simple assignment ( = ).
-                        if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, value);                               
+                        if_member_swap< detect::has_member_swap<T>::value, T >::exec(this->__myT, value);                               
                     });
                     res.wait(); // Wait for stable state
                     res.get(); // just to get the exception if one occured!
@@ -133,7 +137,7 @@ namespace concurrent
                 static_assert( std::is_move_assignable<T>::value, "T is not move-assignable!" );
                 if (this != std::addressof(rhs))
                 {
-                    rhs.__innerqueue.push([=]() { rhs.__done = true; });
+                    rhs.__innerqueue.push([&]() { rhs.__done = true; }); // [Note] We're not using the "<=" operator here, but the worker queue.
                     rhs.__workerThread.join();
                     this->__myT = std::move(rhs.__myT);
                 }                
@@ -236,7 +240,7 @@ namespace concurrent
                     // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
                     // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                     // a simple assignment ( = ).
-                    if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, rhs.__myT);
+                    if_member_swap< detect::has_member_swap<T>::value, T >::exec(this->__myT, rhs.__myT);
                 }
             }
 
@@ -280,7 +284,7 @@ namespace concurrent
                     // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
                     // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                     // a simple assignment ( = ).
-                    if_member_swap< detect::has_member_swap<T>::value >::exec(this->__myT, rhs.__myT);
+                    if_member_swap< detect::has_member_swap<T>::value, T >::exec(this->__myT, rhs.__myT);
                 }                
                 return *this;
             }

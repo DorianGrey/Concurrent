@@ -10,6 +10,26 @@ namespace conc_test
 {
     namespace async_object
     {
+        void test_move()
+        {
+            concurrent::async_object<std::string> blub ("Hello World!");
+            concurrent::async_object<std::string> blub2 ("Hello Ape!");
+            blub2 = std::move(blub);
+            blub2 <= ( [](std::string& s) -> void {
+                std::cout <<  s << std::endl;
+            });
+        }
+
+        void test_copy()
+        {
+            concurrent::async_object<std::string> blub ("Hello World!");
+            concurrent::async_object<std::string> blub2 ("Hello Ape!");
+            blub = blub2;
+            blub <= ( [](std::string& s) -> void {
+                std::cout <<  s << std::endl;
+            });
+        }
+
         struct foo_functor_side
         {
             void operator()(std::string& s) const 
@@ -27,7 +47,7 @@ namespace conc_test
         {
             concurrent::async_object<std::string> blub ("Hello World!");
             // Testing with lambda expression.
-            auto res = blub <= ( [](std::string& s) -> void{
+            auto res = blub <= ( [](std::string& s) -> void {
                  s += " omfg!";
             });
             // Testing with free function.
@@ -35,8 +55,8 @@ namespace conc_test
             // Testing with functor struct.
             auto res3 = blub <= foo_functor_side();
 
-            blub <= ( [](std::string& s) -> void{
-                std::cout << "<Test result>" << s << std::endl;
+            blub <= ( [](std::string& s) -> void {
+                std::cout << "<Test result> " << s << std::endl;
             }); 
         }
 
@@ -77,6 +97,12 @@ namespace conc_test
 
             std::cout << "[:: Test 2: Call with side effects. ::]" << std::endl;
             test_side_effects();
+
+            std::cout << "[:: Test 3: Copy stuff. ::]" << std::endl;
+            test_copy();
+
+            std::cout << "[:: Test 4: Move stuff. ::]" << std::endl;
+            test_move();
         }
     }
 }
