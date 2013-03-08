@@ -10,13 +10,31 @@ namespace conc_test
 {
     namespace sync_object
     {
+        void test_move_ctor()
+        {
+            concurrent::sync_object<std::string> blub ("Hello World!");
+            concurrent::sync_object<std::string> blub2 (std::move(blub));
+            blub2 <= ( [](std::string& s) -> void {
+                std::cout << s << std::endl;
+            });
+        }
+
         void test_move()
         {
             concurrent::sync_object<std::string> blub ("Hello World!");
             concurrent::sync_object<std::string> blub2 ("Hello Ape!");
             blub2 = std::move(blub);
             blub2 <= ( [](std::string& s) -> void {
-                std::cout <<  s << std::endl;
+                std::cout << s << std::endl;
+            });
+        }
+
+        void test_copy_ctor()
+        {
+            concurrent::sync_object<std::string> blub ("Hello World!");
+            concurrent::sync_object<std::string> blub2 (blub);
+            blub2 <= ( [](std::string& s) -> void {
+                std::cout << s << std::endl;
             });
         }
 
@@ -26,7 +44,7 @@ namespace conc_test
             concurrent::sync_object<std::string> blub2 ("Hello Ape!");
             blub = blub2;
             blub <= ( [](std::string& s) -> void {
-                std::cout <<  s << std::endl;
+                std::cout << s << std::endl;
             });
         }
 
@@ -97,8 +115,14 @@ namespace conc_test
             std::cout << "[:: Test 3: Copy stuff. ::]" << std::endl;
             test_copy();
 
-            std::cout << "[:: Test 4: Move stuff. ::]" << std::endl;
+            std::cout << "[:: Test 4: Copy ctor stuff. ::]" << std::endl;
+            test_copy_ctor();
+
+            std::cout << "[:: Test 5: Move stuff. ::]" << std::endl;
             test_move();
+
+            std::cout << "[:: Test 6: Move ctor stuff. ::]" << std::endl;
+            test_move_ctor();
         }
     }
 }

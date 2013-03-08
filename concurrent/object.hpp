@@ -57,7 +57,7 @@ namespace concurrent
                 static_assert( std::is_copy_constructible<T>::value, "T is not copy-constructible!" );
                 if (this != std::addressof(rhs))
                 {
-                    auto res = rhs->__innerqueue.push([&](T& value) -> void {
+                    auto res = rhs <= ([&](T& value) -> void {
                         // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
                         // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                         // a simple assignment ( = ).
@@ -80,7 +80,7 @@ namespace concurrent
                 static_assert( std::is_move_constructible<T>::value, "T is not move-constructible!" );
                 if (this != std::addressof(rhs))
                 {
-                    rhs.__innerqueue.push([=]() { rhs.__done = true; });
+                    rhs.__innerqueue.push([&]() { rhs.__done = true; });
                     rhs.__workerThread.join();
                     this->__myT = std::move(rhs.__myT);
                 }
@@ -119,7 +119,7 @@ namespace concurrent
                         if_member_swap< detect::has_member_swap<T>::value, T >::exec(this->__myT, value);                               
                     });
                     res.wait(); // Wait for stable state
-                    res.get(); // just to get the exception if one occured!
+                    res.get(); // just to get the exception if one occurred!
                 }                
                 return *this;
             }
@@ -236,7 +236,7 @@ namespace concurrent
                 if (this != std::addressof(rhs))
                 {
                     std::lock_guard<std::mutex> guard(rhs.__lock);
-                    std::lock_guard<std::mutex> guard(this->__lock);
+                    std::lock_guard<std::mutex> guard2(this->__lock);
                     // If T has a member-swap that takes another instance of T as a reference and returns void, it is considered to support the copy-and-swap-idiom.
                     // In this case, the call below will reach the function that uses this idiom to assign the rhs-T to the local one, otherwise, it will perform
                     // a simple assignment ( = ).
@@ -256,7 +256,7 @@ namespace concurrent
                 if (this != std::addressof(rhs))
                 {
                     std::lock_guard<std::mutex> guard(rhs.__lock);
-                    std::lock_guard<std::mutex> guard(this->__lock);
+                    std::lock_guard<std::mutex> guard2(this->__lock);
                     this->__myT = std::move(rhs.__myT);
                 }
             }
