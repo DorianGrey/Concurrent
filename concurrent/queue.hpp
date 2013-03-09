@@ -93,7 +93,7 @@ namespace concurrent
             void swap(queue& rhs) 
             {
                 std::unique_lock<std::mutex> lock(this->__accessMutex);
-                std::unique_lock<std::mutex> lock2(rhs->__accessMutex);
+                std::unique_lock<std::mutex> lock2(rhs.__accessMutex);
                 std::swap(this->__storage, rhs.__storage);
             }
 

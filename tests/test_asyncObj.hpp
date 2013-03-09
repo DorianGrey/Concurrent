@@ -13,6 +13,12 @@ namespace conc_test
         void test_move_ctor()
         {
             concurrent::async_object<std::string> blub ("Hello World!");
+            blub <= ( [](std::string& s) -> void {
+                s+=" ";
+            });
+            blub <= ( [](std::string& s) -> void {
+                s+="I'm Ape Lincoln!";
+            });
             concurrent::async_object<std::string> blub2 (std::move(blub));
             auto res = blub2 <= ( [](std::string& s) -> void {
                 std::cout << s << std::endl;
@@ -21,8 +27,22 @@ namespace conc_test
 
         void test_move()
         {
-            concurrent::async_object<std::string> blub ("Hello World!");
+            concurrent::async_object<std::string> blub ("Hello World!");           
             concurrent::async_object<std::string> blub2 ("Hello Ape!");
+
+            blub <= ( [](std::string& s) -> void {
+                s+=" ";
+            });
+            blub <= ( [](std::string& s) -> void {
+                s+="I'm Ape Lincoln!";
+            });
+
+            blub2 <= ( [](std::string& s) -> void {
+                s+=" ";
+            });
+            blub2 <= ( [](std::string& s) -> void {
+                s+="I'm John Sparton!";
+            });
             blub2 = std::move(blub);
             auto res = blub2 <= ( [](std::string& s) -> void {
                 std::cout << s << std::endl;

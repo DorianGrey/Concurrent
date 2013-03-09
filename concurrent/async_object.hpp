@@ -25,9 +25,12 @@ namespace concurrent
      *         As a result, all return values are futures.
      *         It is based upon the concurrent<T> class presented by Herb Sutter.
      *         http://channel9.msdn.com/Shows/Going+Deep/C-and-Beyond-2012-Herb-Sutter-Concurrency-and-Parallelism
-     *         Moving in an asynchronous object is rather complicated. Theoretically, we should move any open jobs, but that's not possible, due to their boundaries.
-     *         Besides, data cannot be moved as long as it is (theoretically) modified. Considering this, moving is only possible when an object is not currently 
-     *         in modification. Thus, we have to let the other object run any job left (same as in its d'tor), and fetch the data object afterwards. 
+     *         Moving in an asynchronous object is rather complicated. Theoretically, we should move any open jobs, but it possibly breaks their boundaries (not sure about this).
+     *         Swapping itself is implemented by concurrent::queue in a thread-safe version, so that's not a problem. Besides, data cannot be moved as long as it is (theoretically) 
+     *         modified. Considering this, moving is only possible when an object is not currently in modification. In case of move construction, the problem turns out to be quite
+     *         simple, since the destination did not do anything before. This is more complicated in case of move assignment. 
+     *         Anyway, the current state of move support should be considered as EXPERIMENTAL - the current test-stage did not discover any issues, but since the execution order
+     *         cannot be completely determined, it does not mean that there are none.
      *
      *  \param Data-type that should be covered by this class.
      */
@@ -70,14 +73,16 @@ namespace concurrent
              *
              * \param rhs async_object&& Asynchronized object to move from.
              * \note If this c'tor can be used depends on T having a move-c'tor or not - you will get a compile-error if it does not!
-             *       This c'tor will block until the rhs instance move the requested value (i.e., it waits for the future value), so handle it with care!
+             *       This c'tor will block until the rhs instance moved the requested value (i.e., it waits for the future value), so handle it with care!
              *       The effect on rhs depends on the effect defined on its T value's move-c'tor!
+             * \note Moving the rhs message queue is logically correct (to complete open requests, though), but currently EXPERIMENTAL. If you face any issues, remove the corresponding line!
              */
             async_object(async_object&& rhs) : __workerThread([=]() -> void { __done = false; while (!__done) { this->__innerqueue.pop()(); }})
             {
                 static_assert( std::is_move_constructible<T>::value, "T is not move-constructible!" );
                 if (this != std::addressof(rhs))
                 {
+                    this->__innerqueue.swap(rhs.__innerqueue);
                     rhs.__innerqueue.push([&]() { rhs.__done = true; });
                     rhs.__workerThread.join();
                     this->__myT = std::move(rhs.__myT);
@@ -129,12 +134,14 @@ namespace concurrent
              * \note Using this function depends on T having a defined move-assignment operator or not - you will get a compile-error if it does not have one!
              *       This assignment will block until the rhs instance moved the requested value (i.e., it waits for the future value), so handle it with care!
              *       The effect on rhs depends on the effect defined on its T value's move-assignment operator!
+             * \note Moving the rhs message queue is logically correct (to complete open requests, though), but currently EXPERIMENTAL. If you face any issues, remove the corresponding line!
              */
             async_object& operator=(async_object&& rhs)
             {
                 static_assert( std::is_move_assignable<T>::value, "T is not move-assignable!" );
                 if (this != std::addressof(rhs))
                 {
+                    this->__innerqueue.swap(rhs.__innerqueue);
                     rhs.__innerqueue.push([&]() { rhs.__done = true; }); // [Note] We're not using the "<=" operator here, but the worker queue.
                     rhs.__workerThread.join();
                     this->__myT = std::move(rhs.__myT);
