@@ -90,6 +90,13 @@ namespace concurrent
                 std::swap(this->__storage, empty);
             }
 
+            void swap(queue& rhs) 
+            {
+                std::unique_lock<std::mutex> lock(this->__accessMutex);
+                std::unique_lock<std::mutex> lock2(rhs->__accessMutex);
+                std::swap(this->__storage, rhs.__storage);
+            }
+
         private:
             // Prohibitions
             queue(const queue& rhs);                /**< queues must not be copied */

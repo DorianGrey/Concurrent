@@ -1,7 +1,7 @@
 #ifndef __TEST_SYNC_OBJ_HPP__
 #define __TEST_SYNC_OBJ_HPP__
 
-#include "concurrent/object.hpp"
+#include "concurrent/sync_object.hpp"
 
 #include <iostream>
 #include <string>
