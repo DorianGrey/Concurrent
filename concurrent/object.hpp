@@ -52,7 +52,7 @@ namespace concurrent
              * \note If this c'tor can be used depends on T having a copy-c'tor or not - you will get a compile-error if it does not!
              *       This c'tor will block until the rhs instance copied the requested value (i.e., it waits for the future value), so handle it with care!
              */
-            async_object(const async_object& rhs)
+            async_object(const async_object& rhs) : __workerThread([=]() -> void { __done = false; while (!__done) { this->__innerqueue.pop()(); }})
             {
                 static_assert( std::is_copy_constructible<T>::value, "T is not copy-constructible!" );
                 if (this != std::addressof(rhs))
@@ -75,7 +75,7 @@ namespace concurrent
              *       This c'tor will block until the rhs instance move the requested value (i.e., it waits for the future value), so handle it with care!
              *       The effect on rhs depends on the effect defined on its T value's move-c'tor!
              */
-            async_object(async_object&& rhs)
+            async_object(async_object&& rhs) : __workerThread([=]() -> void { __done = false; while (!__done) { this->__innerqueue.pop()(); }})
             {
                 static_assert( std::is_move_constructible<T>::value, "T is not move-constructible!" );
                 if (this != std::addressof(rhs))
