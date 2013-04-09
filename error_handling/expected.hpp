@@ -2,7 +2,11 @@
 #define __EXPECTED_HPP__
 
 #include <exception>
+#include <iostream>
+#include <stdexcept>
 #include <type_traits>
+#include <typeinfo>
+#include <utility> 
 
 #define WITH_CPP11__UNION 0 // Not yet supported by VS, thus disabled
 
@@ -31,10 +35,10 @@ namespace expected
                     new(std::addressof(this->__excpt)) std::exception_ptr(rhs.__excpt);
             }
 
-            value(value&& rhs) : __hasData(rhs.gotHam) 
+            value(value&& rhs) : __hasData(rhs.__hasData) 
             {
                 if (this->__hasData) 
-                    new(std::addressof(this->__data)) T(std::move(rhs.ham));
+                    new(std::addressof(this->__data)) T(std::move(rhs.__data));
                 else 
                     new(std::addressof(this->__excpt)) std::exception_ptr(std::move(rhs.__excpt));
             }
@@ -210,34 +214,64 @@ namespace expected
         template<bool, typename T, typename F>
         struct result_of
         {
-            static value<T> get(F fun)
+            template<typename... Args>
+            static value<T> get(F fun, Args&&... arguments)
             {
-                return value<T>(fun());
+                return value<T>(fun( std::forward<Args>(arguments)... ));
             }
         };
 
         template<typename F>
         struct result_of<true, void, F>
         {
-            static value<void> get(F fun)
+            template<typename... Args>
+            static value<void> get(F fun, Args&&... arguments)
             {
-                fun();
+                fun( std::forward<Args>(arguments)... );
                 return value<void>();
             }
         };
     }
 
+    // MSVC workaround, since it currently gets confused by "..." if both used for template deduction and wildcard-description.
+    #ifdef _MSC_VER
+        struct wildcard { wildcard(...) {}; };
+    #endif
 
+#ifndef _MSC_VER // This function works on Clang 3.2, GCC 4.8 and Intel 13 - only MSVC mentions that it cannot deduce the return type.
+    template <typename F, typename... Args>
+    auto result_of(F fun, Args&& ...arguments) -> value< decltype(fun( std::forward<Args>(arguments)... )) > {
+        typedef decltype(fun( std::forward<Args>(arguments)... )) ret_type;
+        try {
+            // template-based selection between functions that return nothing or something valuable - conditional compile-time selection for runtime execution 
+            return detail::result_of< 
+                std::is_same< ret_type, void >::value, 
+                ret_type, 
+                F 
+            >::get(fun, std::forward<Args>(arguments)...); 
+        } catch (
+        #ifdef __MSC_VER__  // Don't get confused, it's only mentioned here since I don't know when MSVC will no longer be confused by this - it's possible that the type deducing above will work before.
+            wildcard /*e*/ 
+        #else
+            ...
+        #endif
+            ) 
+        {
+            return value< ret_type >::from_exception();
+        }
+    }
+#else
     template <typename F>
     auto result_of(F fun) -> value<decltype(fun())> {
         try {
             // template-based selection between functions that return nothing or something valuable - conditional compile-time selection for runtime execution
             return detail::result_of< std::is_same< decltype(fun()),void >::value, decltype(fun()), F >::get(fun); 
-        } catch (...) {
+        } catch (...) 
+        {
             return value<decltype(fun())>::from_exception();
         }
     }
-
+#endif
 }  
 
 #undef WITH_CPP11__UNION

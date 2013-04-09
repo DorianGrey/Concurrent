@@ -56,7 +56,8 @@ namespace scope_guard
     template<typename Functor1, typename Functor2>
     class do_undo
     {
-        private:    
+        private:
+            bool __isActive;    
             Functor1 __do;
             Functor2 __undo;
 
@@ -79,9 +80,9 @@ namespace scope_guard
                 }
             }
             
-            auto operator~() -> decltype(expected::result_of<Functor1>(__do))
+            auto operator~() -> decltype(expected::result_of(__do))
             {
-                return expected::result_of<Functor1>(__do);   
+                return expected::result_of(__do);   
             } 
 
             void operator!() // Uses toggle mode, might be useful in several cases
@@ -89,8 +90,7 @@ namespace scope_guard
                 this->__isActive = !this->__isActive;
             }
 
-        private:
-            bool __isActive;
+        private:            
             
         #if WITH_CPP_11__CTOR_DISABLING != 0
             do_undo(const do_undo& rhs) = delete;
@@ -110,7 +110,7 @@ namespace scope_guard
     template<typename Functor1, typename Functor2>
     do_undo<Functor1, Functor2> make(Functor1&& f1, Functor2&& f2)
     {
-        return do_undo<Functor1, Functor2>(std::forward<Functor1&& >(f1), std::forward<Functor2&&>(f2));
+        return do_undo<Functor1, Functor2>(std::forward<Functor1&&>(f1), std::forward<Functor2&&>(f2));
     }
 }
 
